@@ -1,0 +1,4 @@
+--class-path src/seaborg
+--macro nullSafety("scanning")
+--main Lox
+--neko bin/lox.n

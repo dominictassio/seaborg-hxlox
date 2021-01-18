@@ -4,6 +4,7 @@ import sys.FileSystem;
 import sys.io.File;
 import scanning.Scanner;
 import scanning.Token;
+import parsing.Parser;
 
 class Lox {
 	// private static final interpreter:Interpreter = new Interpreter();
@@ -71,8 +72,8 @@ class Lox {
 	private static function run(source:String) {
 		final scanner = new Scanner(source);
 		final tokens = scanner.scanTokens();
-		// final parser = new Parser(tokens);
-		// final statements = parser.parse();
+		final parser = new Parser(tokens);
+		final statements = parser.parse();
 		// resolver.resolve(stmts);
 		// if (hadError)
 		// 	return;

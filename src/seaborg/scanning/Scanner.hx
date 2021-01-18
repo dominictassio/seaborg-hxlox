@@ -74,7 +74,7 @@ class Scanner {
 				else if (c == '"')
 					scanString();
 				else
-					Lox.error({line: line}, 'Unexpected character: $c');
+					Lox.scanError(line, 'Unexpected character: $c');
 		}
 	}
 
@@ -114,7 +114,7 @@ class Scanner {
 			advance();
 		}
 		if (isAtEnd()) {
-			Lox.error({line: line}, 'Unterminated string.');
+			Lox.scanError(line, 'Unterminated string.');
 			return;
 		}
 		// The closing quote

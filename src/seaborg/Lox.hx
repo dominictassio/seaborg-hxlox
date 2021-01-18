@@ -3,7 +3,7 @@ import haxe.io.Path;
 import sys.FileSystem;
 import sys.io.File;
 import scanning.Scanner;
-import scanning.TokenType;
+import scanning.Token;
 
 class Lox {
 	// private static final interpreter:Interpreter = new Interpreter();
@@ -22,18 +22,17 @@ class Lox {
 		}
 	}
 
-	public static function error(token:{
-		line:Int,
-		?lexeme:String,
-		?type:TokenType
-	}, message:String) {
-		if (token.type == null) {
-			report(token.line, '', message);
-		} else if (token.type.equals(Eof)) {
-			report(token.line, ' at end', message);
-		} else {
-			report(token.line, ' at\'${token.lexeme}\'', message);
-		}
+	public static function scanError(line:Int, message:String) {
+		report(line, '', message);
+	}
+
+	public static function parseError(token:Token, message:String) {
+		report(token.line, ' at ' + switch (token.type) {
+			case Eof:
+				'end';
+			default:
+				'\'${token.lexeme}\'';
+		}, message);
 	}
 
 	// public static function runtimeError(error:Interpreting.RuntimeError) {

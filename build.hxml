@@ -1,4 +1,4 @@
---class-path src/seaborg
+--class-path src
 --macro nullSafety("parsing")
 --macro nullSafety("scanning")
 --main Lox

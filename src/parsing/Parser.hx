@@ -1,8 +1,8 @@
 package parsing;
 
 import scanning.TokenType;
-import parsing.ast.Expression;
-import parsing.ast.Statement;
+import parsing.ast.Expr;
+import parsing.ast.Stmt;
 import scanning.Token;
 
 class Parser {
@@ -14,18 +14,22 @@ class Parser {
 	}
 
 	public function parse() {
-		final statements = new Array<Statement>();
-		while (!isAtEnd()) {
-			final statement = parseDeclaration();
-			if (statement != null)
-				statements.push(statement);
-		}
+		final statements = [
+			while (!isAtEnd()) {
+				switch (parseDeclaration()) {
+					case None:
+						continue;
+					case stmt:
+						stmt;
+				}
+			}
+		];
 		return statements;
 	}
 
-	private function parseDeclaration():Null<Statement> {
-		try {
-			return switch (peek().type) {
+	private function parseDeclaration() {
+		return try {
+			switch (peek().type) {
 				case Class:
 					parseClassDeclaration();
 				case Fun:
@@ -37,25 +41,29 @@ class Parser {
 			};
 		} catch (error:ParseException) {
 			synchronize();
-			return null;
+			None;
 		}
 	}
 
 	private function parseClassDeclaration() {
-		advance(); // Consume 'class' keyword.
-		final name = consume(Identifier, 'Expect class name.');
-		var superclass = if (match([Less])) new Variable(consume(Identifier, 'Expect superclass name.')) else null;
-		consume(LeftBrace, 'Expect \'{\' before class body.');
+		consume(Class, "Expect 'class'.");
+		final name = consume(Identifier, "Expect class name.");
+		var superclass = if (match([Less])) {
+			new Variable(consume(Identifier, "Expect superclass name."));
+		} else {
+			null;
+		};
+		consume(LeftBrace, "Expect '{' before class body.");
 		final methods = [];
 		while (!check(RightBrace) && !isAtEnd())
 			methods.push(parseFunction("method"));
-		consume(RightBrace, 'Expect \'}\' after class body.');
-		return Class(name, superclass, methods);
+		consume(RightBrace, "Expect '}' after class body.");
+		return ClassDecl(name, superclass, methods);
 	}
 
 	private function parseFunctionDeclaration() {
-		advance(); // Consume 'fun' keyword
-		return Function(parseFunction("function"));
+		consume(Fun, "Expect 'fun'.");
+		return FunDecl(parseFunction("function"));
 	}
 
 	private function parseFunction(kind:String) {
@@ -64,23 +72,22 @@ class Parser {
 		final parameters = [];
 		if (!check(RightParen))
 			do {
-				if (parameters.length >= 255) {
-					error(peek(), 'Can\'t have more than 255 parameters.');
-				}
-				parameters.push(consume(Identifier, 'Expect parameter name.'));
+				if (parameters.length >= 255)
+					error(peek(), "Can't have more than 255 parameters.");
+				parameters.push(consume(Identifier, "Expect parameter name."));
 			} while (match([Comma]));
-		consume(RightParen, 'Expect \')\' after parameters');
+		consume(RightParen, "Expect ')' after parameters.");
 		consume(LeftBrace, 'Expect \'{\' before $kind body.');
 		final body = parseBlock();
 		return new Function(name, parameters, body);
 	}
 
 	private function parseVariableDeclaration() {
-		advance(); // Consume 'var' keyword
-		final name = consume(Identifier, 'Expect variable name.');
+		consume(Var, "Expect 'var'.");
+		final name = consume(Identifier, "Expect variable name.");
 		final initializer = if (match([Equal])) parseExpression() else null;
-		consume(Semicolon, 'Expect \';\' after variable declaration.');
-		return Variable(name, initializer);
+		consume(Semicolon, "Expect ';' after variable declaration.");
+		return VarDecl(name, initializer);
 	}
 
 	private function parseStatement() {
@@ -103,8 +110,8 @@ class Parser {
 	}
 
 	private function parseForStatement() {
-		advance(); // Consume 'for' keyword
-		consume(LeftParen, 'Expect \'(\' after \'for\'.');
+		consume(For, "Expect 'for'.");
+		consume(LeftParen, "Expect '(' after 'for'.");
 		final initializer = switch (peek().type) {
 			case Semicolon:
 				advance();
@@ -114,73 +121,80 @@ class Parser {
 			default:
 				parseExpressionStatement();
 		};
-		final condition = if (!check(Semicolon)) parseExpression() else Literal(Boolean(true));
-		consume(Semicolon, 'Expect \';\' after loop condition.');
+		final condition = if (!check(Semicolon)) {
+			parseExpression();
+		} else {
+			LiteralExpr(Boolean(true));
+		};
+		consume(Semicolon, "Expect ';' after loop condition.");
 		final increment = if (!check(RightParen)) parseExpression() else null;
-		consume(RightParen, 'Expect \')\' after for clauses.');
+		consume(RightParen, "Expect ')' after for clauses.");
 		var body = parseStatement();
 		if (increment != null)
-			body = Block([body, Expression(increment)]);
-		body = While(condition, body);
+			body = BlockStmt([body, ExprStmt(increment)]);
+		body = WhileStmt(condition, body);
 		if (initializer != null)
-			body = Block([initializer, body]);
+			body = BlockStmt([initializer, body]);
 		return body;
 	}
 
 	private function parseIfStatement() {
-		advance(); // Consume 'if' keyword
-		consume(LeftParen, 'Expect \'(\' after \'if\'.');
+		consume(If, "Expect 'if'.");
+		consume(LeftParen, "Expect '(' after 'if'.");
 		final condition = parseExpression();
-		consume(RightParen, 'Expect \')\' after if condition.');
+		consume(RightParen, "Expect ')' after if condition.");
 		final consequent = parseStatement();
 		final alternative = if (match([Else])) parseStatement() else null;
-		return If(condition, consequent, alternative);
+		return IfStmt(condition, consequent, alternative);
 	}
 
 	private function parsePrintStatement() {
-		advance(); // Consume 'print' keyword
-		final expression = parseExpression();
-		consume(Semicolon, 'Expect \';\' after value.');
-		return Print(expression);
+		consume(Print, "Expect 'print'.");
+		final value = parseExpression();
+		consume(Semicolon, "Expect ';' after value.");
+		return PrintStmt(value);
 	}
 
 	private function parseReturnStatement() {
-		advance(); // Consume 'return' keyword
+		consume(Return, "Expect 'return'.");
 		final keyword = previous();
-		final expression = if (!check(Semicolon)) parseExpression() else null;
-		consume(Semicolon, 'Expect \';\' after return value.');
-		return Return(keyword, expression);
+		final value = if (!check(Semicolon)) parseExpression() else null;
+		consume(Semicolon, "Expect ';' after return value.");
+		return ReturnStmt(keyword, value);
 	}
 
 	private function parseWhileStatement() {
-		advance(); // Consume 'while' keyword
-		consume(LeftParen, 'Expect \'(\' after \'whie\'.');
+		consume(While, "Expect 'while'.");
+		consume(LeftParen, "Expect '(' after 'while'.");
 		final condition = parseExpression();
-		consume(RightParen, 'Expect \')\' after condition.');
+		consume(RightParen, "Expect ')' after condition.");
 		final body = parseStatement();
-		return While(condition, body);
+		return WhileStmt(condition, body);
 	}
 
 	private function parseBlockStatement() {
-		return Block(parseBlock());
+		consume(LeftBrace, "Expect '{'.");
+		return BlockStmt(parseBlock());
 	}
 
 	private function parseBlock() {
-		advance(); // Consume '{'
-		final statements = new Array<Statement>();
-		while (!check(RightBrace) && !isAtEnd()) {
-			final statement = parseDeclaration();
-			if (statement != null)
-				statements.push(statement);
-		}
-		consume(RightBrace, 'Expect \'}\' after block.');
+		final statements = [
+			while (!check(RightBrace) && !isAtEnd())
+				switch parseDeclaration() {
+					case None:
+						continue;
+					case stmt:
+						stmt;
+				}
+		];
+		consume(RightBrace, "Expect '}' after block.");
 		return statements;
 	}
 
 	private function parseExpressionStatement() {
 		final expression = parseExpression();
-		consume(Semicolon, 'Expect \';\' after expression.');
-		return Expression(expression);
+		consume(Semicolon, "Expect ';' after expression.");
+		return ExprStmt(expression);
 	}
 
 	private function parseExpression() {
@@ -193,10 +207,10 @@ class Parser {
 			final equals = previous();
 			final value = parseAssignment();
 			switch (expression) {
-				case Variable(variable):
-					return Assign(variable.name, value);
-				case Get(object, name):
-					return Set(object, name, value);
+				case VariableExpr(variable):
+					return AssignExpr(variable.name, value);
+				case GetExpr(object, name):
+					return SetExpr(object, name, value);
 				default:
 					error(equals, 'Invalid assignment target.');
 			}
@@ -212,12 +226,12 @@ class Parser {
 		return parseLogicalExpression([And], parseEquality);
 	}
 
-	private function parseLogicalExpression(operators, next) {
+	inline private function parseLogicalExpression(operators, next) {
 		var left = next();
 		while (match(operators)) {
-			final operator_ = previous();
+			final op = previous();
 			final right = next();
-			left = Logical(left, operator_, right);
+			left = LogicalExpr(left, op, right);
 		}
 		return left;
 	}
@@ -238,90 +252,81 @@ class Parser {
 		return parseBinaryExpression([Slash, Star], parsePrefix);
 	}
 
-	private function parsePrefix() {
-		if (match([Bang, Minus])) {
-			final operator_ = previous();
-			final right = parsePrefix();
-			return Prefix(operator_, right);
-		}
-		return parseCall();
-	}
-
-	private function parseCall() {
-		var expression = parsePrimary();
-		while (true) {
-			switch (peek().type) {
-				case LeftParen:
-					advance();
-					expression = finishCall(expression);
-				case Period:
-					advance();
-					final name = consume(Identifier, 'Expect property name after \'.\'.');
-					expression = Get(expression, name);
-				default:
-					break;
-			}
-		}
-		return expression;
-	}
-
-	private function finishCall(callee:Expression) {
-		final arguments = [];
-		if (!check(RightParen)) {
-			do {
-				if (arguments.length >= 255) {
-					error(peek(), 'Can\'t have more than 255 arguments.');
-				}
-				arguments.push(parseExpression());
-			} while (match([Comma]));
-		}
-		final parenthesis = consume(RightParen, 'Expect \')\' after arguments.');
-		return Call(callee, parenthesis, arguments);
-	}
-
-	private function parsePrimary() {
-		final next = peek();
-		final literal = next.literal;
-		return switch (next.type) {
-			case False:
-				advance();
-				Literal(Boolean(false));
-			case True:
-				advance();
-				Literal(Boolean(true));
-			case Nil:
-				advance();
-				Literal(Nil);
-			case Number | String if (literal != null):
-				advance();
-				Literal(literal);
-			case Super:
-				final keyword = advance();
-				consume(Period, 'Expect \'.\' after \'super\'.');
-				final method = consume(Identifier, 'Expect superclass method name.');
-				Super(keyword, method);
-			case This:
-				This(advance());
-			case Identifier:
-				(Variable(new Variable(advance())) : Expression);
-			case LeftParen:
-				advance();
-				final expression = parseExpression();
-				consume(RightParen, 'Expect \')\' after expression.');
-				Grouping(expression);
-			default:
-				throw error(next, 'Expect expression');
-		}
-	}
-
 	private function parseBinaryExpression(operators, next) {
 		var left = next();
 		while (match(operators)) {
-			final operator_ = previous();
+			final op = previous();
 			final right = next();
-			left = Binary(left, operator_, right);
+			left = BinaryExpr(left, op, right);
 		}
 		return left;
+	}
+
+	private function parsePrefix() {
+		return if (match([Bang, Minus])) {
+			final operator_ = previous();
+			final right = parsePrefix();
+			PrefixExpr(operator_, right);
+		} else parseCall();
+	}
+
+	private function parseCall() {
+		var expr = parsePrimary();
+		while (true)
+			expr = switch peek().type {
+				case LeftParen:
+					advance();
+					finishCall(expr);
+				case Period:
+					advance();
+					final name = consume(Identifier, "Expect property name after '.'.");
+					GetExpr(expr, name);
+				default:
+					break;
+			}
+		return expr;
+	}
+
+	private function finishCall(callee) {
+		final args = [];
+		if (!check(RightParen))
+			do {
+				if (args.length >= 255)
+					error(peek(), 'Can\'t have more than 255 arguments.');
+				args.push(parseExpression());
+			} while (match([Comma]));
+		final parenthesis = consume(RightParen, 'Expect \')\' after arguments.');
+		return CallExpr(callee, parenthesis, args);
+	}
+
+	private function parsePrimary() {
+		final next = advance();
+		final literal = next.literal;
+		return switch next.type {
+			case False:
+				LiteralExpr(Boolean(false));
+			case True:
+				LiteralExpr(Boolean(true));
+			case Nil:
+				LiteralExpr(Nil);
+			case Number | String if (literal != null):
+				LiteralExpr(literal);
+			case Super:
+				final keyword = previous();
+				consume(Period, "Expect '.' after 'super'.");
+				final method = consume(Identifier, "Expect superclass method name.");
+				SuperExpr(keyword, method);
+			case This:
+				ThisExpr(previous());
+			case Identifier:
+				VariableExpr(new Variable(previous()));
+			case LeftParen:
+				final expression = parseExpression();
+				consume(RightParen, "Expect \')\' after expression.");
+				GroupingExpr(expression);
+			default:
+				throw error(previous(), "Expect expression.");
+		}
 	}
 
 	private function match(types:Array<TokenType>) {

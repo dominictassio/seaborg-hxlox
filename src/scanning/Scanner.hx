@@ -3,7 +3,7 @@ package scanning;
 class Scanner {
 	private static final keywords:Map<String, TokenType> = [
 		'and' => And, 'class' => Class, 'else' => Else, 'false' => False, 'fun' => Fun, 'for' => For, 'if' => If, 'nil' => Nil, 'or' => Or, 'print' => Print,
-		'return' => Return, 'super' => Super, 'this' => This, 'var' => Var, 'While' => While
+		'return' => Return, 'super' => Super, 'this' => This, 'var' => Var, 'while' => While
 	];
 
 	private var source:String;
@@ -21,7 +21,7 @@ class Scanner {
 			start = current;
 			scanToken();
 		}
-		tokens.push(new Token('', line, null, Eof));
+		tokens.push(new Token("", line, null, Eof));
 		return tokens;
 	}
 
@@ -74,7 +74,7 @@ class Scanner {
 				else if (c == '"')
 					scanString();
 				else
-					Lox.scanError(line, 'Unexpected character: $c');
+					Lox.scanError(line, "Unexpected character.");
 		}
 	}
 

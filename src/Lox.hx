@@ -2,19 +2,21 @@ import haxe.io.Eof;
 import haxe.io.Path;
 import sys.FileSystem;
 import sys.io.File;
+import analyzing.Resolver;
+import interpreting.Interpreter;
+import parsing.Parser;
 import scanning.Scanner;
 import scanning.Token;
-import parsing.Parser;
 
 class Lox {
-	// private static final interpreter:Interpreter = new Interpreter();
+	private static final interpreter:Interpreter = new Interpreter();
 	public static var hadError:Bool = false;
 	public static var hadRuntimeError:Bool = false;
 
 	public static function main() {
 		final args = Sys.args();
 		if (args.length > 1) {
-			Sys.println('Usage: seaborg-hxlox [script]');
+			Sys.println("Usage: seaborg-hxlox [script]");
 			Sys.exit(64);
 		} else if (args.length == 1) {
 			runFile(args[0]);
@@ -24,11 +26,11 @@ class Lox {
 	}
 
 	public static function scanError(line:Int, message:String) {
-		report(line, '', message);
+		report(line, "", message);
 	}
 
 	public static function parseError(token:Token, message:String) {
-		report(token.line, ' at ' + switch (token.type) {
+		report(token.line, " at " + switch (token.type) {
 			case Eof:
 				'end';
 			default:
@@ -41,13 +43,11 @@ class Lox {
 	// 	hadRuntimeError = true;
 	// }
 
-	private static function runFile(path:String) {
+	private static function runFile(path) {
 		final fullPath = Path.normalize(Path.join([Sys.getCwd(), path]));
-		if (!FileSystem.exists(fullPath)) {
+		if (!FileSystem.exists(fullPath))
 			Sys.exit(66);
-		}
-		final contents = File.getContent(fullPath);
-		runFile(contents);
+		run(File.getContent(fullPath));
 		if (hadError)
 			Sys.exit(65);
 		if (hadRuntimeError)
@@ -57,7 +57,7 @@ class Lox {
 	private static function runPrompt() {
 		final input = Sys.stdin();
 		while (true) {
-			Sys.print('> ');
+			Sys.print("> ");
 			try {
 				final line = input.readLine();
 				run(line);
@@ -73,14 +73,13 @@ class Lox {
 		final scanner = new Scanner(source);
 		final tokens = scanner.scanTokens();
 		final parser = new Parser(tokens);
-		final statements = parser.parse();
-		// resolver.resolve(stmts);
-		// if (hadError)
-		// 	return;
-		// final resolver = new Resolver(interpreter);
-		// resolver.resolve(statements);
-		// if (hadError)
-		// 	return;
+		final stmts = parser.parse();
+		if (hadError)
+			return;
+		final resolver = new Resolver(interpreter);
+		resolver.resolve(stmts);
+		if (hadError)
+			return;
 		// interpreter.interpret(statements);
 	}
 
